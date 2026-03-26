@@ -6,6 +6,7 @@
   <title>Interview Tracker — Mom Test</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -474,9 +475,58 @@
 <div class="toast" id="toast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>Entrevista salva</div>
 
 <script>
-let interviews = JSON.parse(localStorage.getItem('startup-interviews') || '[]');
+// Supabase config
+const SUPABASE_URL = 'https://crzdjqqlcqyrvpyzwapt.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNyemRqcXFsY3F5cnZweXp3YXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MTk2ODgsImV4cCI6MjA4MTM5NTY4OH0.jCJrHXp69y5wt8qBP-rXADPvGRp7PB4rxtUSj2PMvcI';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let interviews = [];
 let currentStep = 0;
 const totalSteps = 7;
+
+// Load from Supabase on start, fallback to localStorage
+async function loadInterviews() {
+  try {
+    const { data, error } = await sb.from('interviews').select('*').order('created_at', { ascending: true });
+    if (error) throw error;
+    interviews = data.map(row => ({
+      id: row.id, nome: row.nome, data: row.data, cargo: row.cargo,
+      sistema: row.sistema, tempoUso: row.tempo_uso, relacao: row.relacao,
+      comoAprendeu: row.como_aprendeu || [], frequencia: row.frequencia,
+      tempoPerdido: row.tempo_perdido, sabeQueNaoOnde: row.sabe_que_nao_onde || [],
+      exemploOrientacao: row.exemplo_orientacao, guru: row.guru,
+      guruImpacto: row.guru_impacto, suporte: row.suporte,
+      notaSuporte: row.nota_suporte, onboarding: row.onboarding,
+      erros: row.erros, erroDescricao: row.erro_descricao,
+      compromissos: row.compromissos || [], referencias: row.referencias,
+      frase: row.frase, surpresa: row.surpresa, hipotese: row.hipotese,
+      q1: row.q1, q2: row.q2, q4: row.q4, q5: row.q5,
+      q9: row.q9, q15: row.q15, q16: row.q16,
+    }));
+    localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+  } catch (e) {
+    console.warn('Supabase offline, usando localStorage:', e.message);
+    interviews = JSON.parse(localStorage.getItem('startup-interviews') || '[]');
+  }
+  updateNavCount();
+}
+
+function toDbRow(iv) {
+  return {
+    id: iv.id, nome: iv.nome, data: iv.data || null, cargo: iv.cargo,
+    sistema: iv.sistema, tempo_uso: iv.tempoUso, relacao: iv.relacao,
+    como_aprendeu: iv.comoAprendeu, frequencia: iv.frequencia,
+    tempo_perdido: iv.tempoPerdido, sabe_que_nao_onde: iv.sabeQueNaoOnde,
+    exemplo_orientacao: iv.exemploOrientacao, guru: iv.guru,
+    guru_impacto: iv.guruImpacto, suporte: iv.suporte,
+    nota_suporte: parseInt(iv.notaSuporte) || null, onboarding: iv.onboarding,
+    erros: iv.erros, erro_descricao: iv.erroDescricao,
+    compromissos: iv.compromissos, referencias: iv.referencias,
+    frase: iv.frase, surpresa: iv.surpresa, hipotese: iv.hipotese,
+    q1: iv.q1, q2: iv.q2, q4: iv.q4, q5: iv.q5,
+    q9: iv.q9, q15: iv.q15, q16: iv.q16,
+  };
+}
 const stepNames = ['Início', 'Contexto', 'Comportamento', 'Alternativas', 'Impacto', 'Compromisso', 'Insights'];
 
 function initWizard() {
@@ -540,11 +590,11 @@ function showPage(page, btn) {
 function togglePill(el) { const cb = el.querySelector('input'); cb.checked = !cb.checked; el.classList.toggle('checked', cb.checked); }
 function getChecked(id) { return [...document.querySelectorAll('#' + id + ' input:checked')].map(c => c.value); }
 
-function saveInterview(e) {
+async function saveInterview(e) {
   e.preventDefault();
   const nome = document.getElementById('f-nome').value;
   if (!nome) { wizardGo(0); return; }
-  interviews.push({
+  const iv = {
     id: Date.now(), nome,
     data: document.getElementById('f-data').value,
     cargo: document.getElementById('f-cargo').value,
@@ -575,8 +625,13 @@ function saveInterview(e) {
     q9: document.getElementById('f-q9')?.value || '',
     q15: document.getElementById('f-q15')?.value || '',
     q16: document.getElementById('f-q16')?.value || '',
-  });
+  };
+  interviews.push(iv);
   localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+  try {
+    const { error } = await sb.from('interviews').insert(toDbRow(iv));
+    if (error) console.warn('Supabase insert error:', error.message);
+  } catch (e) { console.warn('Supabase offline:', e.message); }
   updateNavCount(); showToast(); clearForm(); wizardGo(0);
 }
 
@@ -600,7 +655,13 @@ function renderInterviews() {
   }).join('');
 }
 
-function deleteInterview(id) { if (!confirm('Deletar esta entrevista?')) return; interviews = interviews.filter(iv => iv.id !== id); localStorage.setItem('startup-interviews', JSON.stringify(interviews)); updateNavCount(); renderInterviews(); }
+async function deleteInterview(id) {
+  if (!confirm('Deletar esta entrevista?')) return;
+  interviews = interviews.filter(iv => iv.id !== id);
+  localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+  try { await sb.from('interviews').delete().eq('id', id); } catch (e) { console.warn('Supabase delete error:', e.message); }
+  updateNavCount(); renderInterviews();
+}
 
 function exportData() { const blob = new Blob([JSON.stringify(interviews, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'entrevistas-mom-test-' + new Date().toISOString().split('T')[0] + '.json'; a.click(); }
 
@@ -640,9 +701,9 @@ function updateNavCount() {
   if (circ) circ.style.strokeDashoffset = 81.68 * (1 - Math.min(c / 10, 1));
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
-  updateNavCount();
+  await loadInterviews();
   initWizard();
 });
 </script>
