@@ -63,7 +63,8 @@
     .wizard-line { flex: 1; height: 2px; background: var(--border); transition: background 300ms ease; }
     .wizard-line.done { background: var(--sage); }
     .wizard-labels { display: flex; justify-content: space-between; margin-top: 10px; padding: 0 0; }
-    .wizard-label { font-size: 10px; color: var(--text-dim); text-align: center; width: 70px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; transition: color 200ms; }
+    .wizard-label { font-size: 10px; color: var(--text-dim); text-align: center; width: 70px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; transition: color 200ms; cursor: pointer; }
+    .wizard-label:hover { color: var(--text-body); }
     .wizard-label.active { color: var(--amber); font-weight: 600; }
     .wizard-label.done { color: var(--sage); }
 
@@ -550,7 +551,7 @@ function initWizard() {
   for (let i = 0; i < totalSteps; i++) {
     dotsHTML += `<div class="wizard-dot${i===0?' active':''}" onclick="wizardGo(${i})"></div>`;
     if (i < totalSteps - 1) dotsHTML += '<div class="wizard-line"></div>';
-    labelsHTML += `<div class="wizard-label${i===0?' active':''}">${stepNames[i]}</div>`;
+    labelsHTML += `<div class="wizard-label${i===0?' active':''}" onclick="wizardGo(${i})">${stepNames[i]}</div>`;
   }
   dots.innerHTML = dotsHTML;
   labels.innerHTML = labelsHTML;
