@@ -472,7 +472,7 @@
   </div>
 </main>
 
-<div class="toast" id="toast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>Entrevista salva</div>
+<div class="toast" id="toast"><svg id="toast-icon-ok" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg><svg id="toast-icon-warn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg><span id="toast-msg">Entrevista salva</span></div>
 
 <script>
 // Supabase config
@@ -484,12 +484,13 @@ let interviews = [];
 let currentStep = 0;
 const totalSteps = 7;
 
-// Load from Supabase on start, fallback to localStorage
+// Load from Supabase on start, fallback to localStorage, sync offline data
 async function loadInterviews() {
   try {
     const { data, error } = await sb.from('interviews').select('*').order('created_at', { ascending: true });
     if (error) throw error;
-    interviews = data.map(row => ({
+    const supabaseIds = new Set(data.map(r => r.id));
+    const cloudInterviews = data.map(row => ({
       id: row.id, nome: row.nome, data: row.data, cargo: row.cargo,
       sistema: row.sistema, tempoUso: row.tempo_uso, relacao: row.relacao,
       comoAprendeu: row.como_aprendeu || [], frequencia: row.frequencia,
@@ -500,10 +501,23 @@ async function loadInterviews() {
       erros: row.erros, erroDescricao: row.erro_descricao,
       compromissos: row.compromissos || [], referencias: row.referencias,
       frase: row.frase, surpresa: row.surpresa, hipotese: row.hipotese,
-      q1: row.q1, q2: row.q2, q4: row.q4, q5: row.q5,
-      q9: row.q9, q15: row.q15, q16: row.q16,
+      q4: row.q4, q5: row.q5, q9: row.q9, q15: row.q15, q16: row.q16,
+      _synced: true,
     }));
+    // Sync: push offline-only interviews to Supabase
+    const local = JSON.parse(localStorage.getItem('startup-interviews') || '[]');
+    const unsynced = local.filter(iv => !supabaseIds.has(iv.id));
+    let syncCount = 0;
+    for (const iv of unsynced) {
+      try {
+        const { error: insertErr } = await sb.from('interviews').insert(toDbRow(iv));
+        if (!insertErr) { iv._synced = true; cloudInterviews.push(iv); syncCount++; }
+        else { cloudInterviews.push({ ...iv, _synced: false }); }
+      } catch (_) { cloudInterviews.push({ ...iv, _synced: false }); }
+    }
+    interviews = cloudInterviews;
     localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+    if (syncCount > 0) setTimeout(() => showToast(`${syncCount} entrevista(s) sincronizada(s)`, 'info'), 500);
   } catch (e) {
     console.warn('Supabase offline, usando localStorage:', e.message);
     interviews = JSON.parse(localStorage.getItem('startup-interviews') || '[]');
@@ -523,8 +537,7 @@ function toDbRow(iv) {
     erros: iv.erros, erro_descricao: iv.erroDescricao,
     compromissos: iv.compromissos, referencias: iv.referencias,
     frase: iv.frase, surpresa: iv.surpresa, hipotese: iv.hipotese,
-    q1: iv.q1, q2: iv.q2, q4: iv.q4, q5: iv.q5,
-    q9: iv.q9, q15: iv.q15, q16: iv.q16,
+    q4: iv.q4, q5: iv.q5, q9: iv.q9, q15: iv.q15, q16: iv.q16,
   };
 }
 const stepNames = ['Início', 'Contexto', 'Comportamento', 'Alternativas', 'Impacto', 'Compromisso', 'Insights'];
@@ -592,11 +605,12 @@ function getChecked(id) { return [...document.querySelectorAll('#' + id + ' inpu
 
 async function saveInterview(e) {
   e.preventDefault();
-  const nome = document.getElementById('f-nome').value;
-  if (!nome) { wizardGo(0); return; }
+  const nome = document.getElementById('f-nome').value.trim();
+  const data = document.getElementById('f-data').value;
+  if (!nome) { showToast('Preencha o nome do entrevistado', 'warning'); wizardGo(0); return; }
+  if (!data) { showToast('Preencha a data da entrevista', 'warning'); wizardGo(0); return; }
   const iv = {
-    id: Date.now(), nome,
-    data: document.getElementById('f-data').value,
+    id: Date.now(), nome, data,
     cargo: document.getElementById('f-cargo').value,
     sistema: document.getElementById('f-sistema').value,
     tempoUso: document.getElementById('f-tempo-uso').value,
@@ -618,21 +632,24 @@ async function saveInterview(e) {
     frase: document.getElementById('f-frase').value,
     surpresa: document.getElementById('f-surpresa').value,
     hipotese: document.getElementById('f-hipotese').value,
-    q1: document.getElementById('f-q1')?.value || '',
-    q2: document.getElementById('f-q2')?.value || '',
     q4: document.getElementById('f-q4')?.value || '',
     q5: document.getElementById('f-q5')?.value || '',
     q9: document.getElementById('f-q9')?.value || '',
     q15: document.getElementById('f-q15')?.value || '',
     q16: document.getElementById('f-q16')?.value || '',
+    _synced: false,
   };
   interviews.push(iv);
   localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+  let savedToCloud = false;
   try {
     const { error } = await sb.from('interviews').insert(toDbRow(iv));
-    if (error) console.warn('Supabase insert error:', error.message);
+    if (error) { console.warn('Supabase insert error:', error.message); }
+    else { savedToCloud = true; iv._synced = true; localStorage.setItem('startup-interviews', JSON.stringify(interviews)); }
   } catch (e) { console.warn('Supabase offline:', e.message); }
-  updateNavCount(); showToast(); clearForm(); wizardGo(0);
+  updateNavCount(); clearForm(); wizardGo(0);
+  if (savedToCloud) { showToast('Entrevista salva', 'success'); }
+  else { showToast('Salva localmente (sem internet)', 'warning'); }
 }
 
 function clearForm() {
@@ -642,7 +659,24 @@ function clearForm() {
   document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
 }
 
-function showToast() { const t = document.getElementById('toast'); t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+function showToast(msg = 'Entrevista salva', type = 'success') {
+  const t = document.getElementById('toast');
+  const iconOk = document.getElementById('toast-icon-ok');
+  const iconWarn = document.getElementById('toast-icon-warn');
+  document.getElementById('toast-msg').textContent = msg;
+  if (type === 'warning') {
+    t.style.background = 'var(--amber)';
+    iconOk.style.display = 'none'; iconWarn.style.display = 'inline';
+  } else if (type === 'info') {
+    t.style.background = 'var(--indigo)';
+    iconOk.style.display = 'inline'; iconWarn.style.display = 'none';
+  } else {
+    t.style.background = 'var(--sage)';
+    iconOk.style.display = 'inline'; iconWarn.style.display = 'none';
+  }
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
 
 function renderInterviews() {
   const list = document.getElementById('interviews-list');
@@ -659,7 +693,11 @@ async function deleteInterview(id) {
   if (!confirm('Deletar esta entrevista?')) return;
   interviews = interviews.filter(iv => iv.id !== id);
   localStorage.setItem('startup-interviews', JSON.stringify(interviews));
-  try { await sb.from('interviews').delete().eq('id', id); } catch (e) { console.warn('Supabase delete error:', e.message); }
+  try {
+    const { error } = await sb.from('interviews').delete().eq('id', id);
+    if (error) { showToast('Erro ao deletar no servidor', 'warning'); console.warn('Supabase delete error:', error.message); }
+    else { showToast('Entrevista deletada', 'success'); }
+  } catch (e) { showToast('Deletada localmente (sem internet)', 'warning'); console.warn('Supabase delete error:', e.message); }
   updateNavCount(); renderInterviews();
 }
 
