@@ -510,7 +510,7 @@ async function loadInterviews() {
     let syncCount = 0;
     for (const iv of unsynced) {
       try {
-        const { error: insertErr } = await sb.from('interviews').insert(toDbRow(iv));
+        const { error: insertErr } = await sb.from('interviews').upsert(toDbRow(iv), { onConflict: 'id' });
         if (!insertErr) { iv._synced = true; cloudInterviews.push(iv); syncCount++; }
         else { cloudInterviews.push({ ...iv, _synced: false }); }
       } catch (_) { cloudInterviews.push({ ...iv, _synced: false }); }
@@ -603,12 +603,16 @@ function showPage(page, btn) {
 function togglePill(el) { const cb = el.querySelector('input'); cb.checked = !cb.checked; el.classList.toggle('checked', cb.checked); }
 function getChecked(id) { return [...document.querySelectorAll('#' + id + ' input:checked')].map(c => c.value); }
 
+let _saving = false;
 async function saveInterview(e) {
   e.preventDefault();
+  if (_saving) return;
   const nome = document.getElementById('f-nome').value.trim();
   const data = document.getElementById('f-data').value;
   if (!nome) { showToast('Preencha o nome do entrevistado', 'warning'); wizardGo(0); return; }
   if (!data) { showToast('Preencha a data da entrevista', 'warning'); wizardGo(0); return; }
+  _saving = true;
+  document.getElementById('btn-save').disabled = true;
   const iv = {
     id: Date.now(), nome, data,
     cargo: document.getElementById('f-cargo').value,
@@ -648,6 +652,8 @@ async function saveInterview(e) {
     else { savedToCloud = true; iv._synced = true; localStorage.setItem('startup-interviews', JSON.stringify(interviews)); }
   } catch (e) { console.warn('Supabase offline:', e.message); }
   updateNavCount(); clearForm(); wizardGo(0);
+  _saving = false;
+  document.getElementById('btn-save').disabled = false;
   if (savedToCloud) { showToast('Entrevista salva', 'success'); }
   else { showToast('Salva localmente (sem internet)', 'warning'); }
 }
@@ -659,6 +665,11 @@ function clearForm() {
   document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
 }
 
+// #1 XSS protection — escape HTML in user content
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// #2 Toast with clearTimeout to prevent overlap
+let _toastTimer = null;
 function showToast(msg = 'Entrevista salva', type = 'success') {
   const t = document.getElementById('toast');
   const iconOk = document.getElementById('toast-icon-ok');
@@ -674,8 +685,9 @@ function showToast(msg = 'Entrevista salva', type = 'success') {
     t.style.background = 'var(--sage)';
     iconOk.style.display = 'inline'; iconWarn.style.display = 'none';
   }
+  if (_toastTimer) clearTimeout(_toastTimer);
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
+  _toastTimer = setTimeout(() => { t.classList.remove('show'); _toastTimer = null; }, 3000);
 }
 
 function renderInterviews() {
@@ -685,7 +697,7 @@ function renderInterviews() {
     const freq = iv.frequencia || '—';
     const guru = iv.guru === 'sim' ? 'Sim' : iv.guru === 'nao' ? 'Não' : '—';
     const hasComp = iv.compromissos && iv.compromissos.length > 0 && !iv.compromissos.includes('nenhum');
-    return `<div class="interview-row"><span class="interview-num">${String(i+1).padStart(2,'0')}</span><span><strong style="color:var(--ink)">${iv.nome}</strong><br><span style="color:var(--text-muted);font-size:12px">${iv.sistema||'—'} · ${iv.cargo||'—'}</span></span><span class="badge ${freq==='diaria'?'badge-green':freq==='semanal'?'badge-yellow':'badge-red'}">${freq}</span><span style="font-weight:500">${guru}</span><span>${hasComp?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-red">Não</span>'}</span><span><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteInterview(${iv.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span></div>`;
+    return `<div class="interview-row"><span class="interview-num">${String(i+1).padStart(2,'0')}</span><span><strong style="color:var(--ink)">${esc(iv.nome)}</strong><br><span style="color:var(--text-muted);font-size:12px">${esc(iv.sistema)||'—'} · ${esc(iv.cargo)||'—'}</span></span><span class="badge ${freq==='diaria'?'badge-green':freq==='semanal'?'badge-yellow':'badge-red'}">${esc(freq)}</span><span style="font-weight:500">${guru}</span><span>${hasComp?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-red">Não</span>'}</span><span><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteInterview(${iv.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span></div>`;
   }).join('');
 }
 
@@ -701,7 +713,15 @@ async function deleteInterview(id) {
   updateNavCount(); renderInterviews();
 }
 
-function exportData() { const blob = new Blob([JSON.stringify(interviews, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'entrevistas-mom-test-' + new Date().toISOString().split('T')[0] + '.json'; a.click(); }
+function exportData() {
+  const clean = interviews.map(({ _synced, ...rest }) => rest);
+  const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'entrevistas-mom-test-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 
 function renderDashboard() {
   const t = interviews.length;
@@ -741,6 +761,7 @@ function updateNavCount() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('nav-count').textContent = '...';
   await loadInterviews();
   initWizard();
 });
