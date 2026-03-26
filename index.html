@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interview Tracker — Mom Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #FDFBF7;
+      --bg-warm: #F7F3EC;
+      --bg-card: #FFFFFF;
+      --bg-inset: #F3EFE7;
+      --bg-code: #2D2A24;
+      --border: #E8E2D6;
+      --border-light: #F0EBE1;
+      --text: #1A1814;
+      --text-body: #3D3830;
+      --text-muted: #8A8279;
+      --text-dim: #B5AFA5;
+      --ink: #1A1814;
+      --amber: #C2841A;
+      --amber-light: #F0D68A;
+      --amber-bg: #FDF6E3;
+      --sage: #5B8A6F;
+      --sage-light: #D4E8DA;
+      --sage-bg: #F0F7F2;
+      --coral: #C75B3F;
+      --coral-light: #F4C4B7;
+      --coral-bg: #FDF1ED;
+      --indigo: #5B6AAF;
+      --indigo-light: #C5CAE8;
+      --indigo-bg: #F0F1F8;
+      --plum: #8B5E83;
+      --plum-bg: #F8F0F6;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 3px rgba(26,24,20,0.04), 0 1px 2px rgba(26,24,20,0.06);
+      --shadow: 0 4px 16px rgba(26,24,20,0.06), 0 1px 3px rgba(26,24,20,0.04);
+      --shadow-lg: 0 12px 40px rgba(26,24,20,0.08), 0 2px 6px rgba(26,24,20,0.04);
+    }
+
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text-body);
+      line-height: 1.65;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* grain overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 9999;
+      pointer-events: none;
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    h1, h2, h3, .section-title, .card-title, .stat-value, .gate-verdict-text {
+      font-family: 'DM Serif Display', Georgia, serif;
+      color: var(--ink);
+    }
+
+    /* === NAV === */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(253,251,247,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 960px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 58px; padding: 0 28px;
+    }
+    .nav-brand {
+      font-family: 'DM Serif Display', serif;
+      font-size: 18px; color: var(--ink);
+      display: flex; align-items: center; gap: 10px;
+      letter-spacing: -0.3px;
+    }
+    .nav-brand-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 0 3px var(--amber-bg);
+    }
+    .nav-tabs { display: flex; gap: 2px; background: var(--bg-warm); border-radius: 8px; padding: 3px; }
+    .nav-tab {
+      padding: 7px 16px; border-radius: 6px; cursor: pointer;
+      font-size: 13px; font-weight: 500;
+      color: var(--text-muted); background: transparent;
+      border: none; font-family: inherit;
+      transition: all 200ms ease;
+    }
+    .nav-tab:hover { color: var(--text-body); }
+    .nav-tab.active {
+      color: var(--ink); background: var(--bg-card);
+      box-shadow: var(--shadow-sm);
+      font-weight: 600;
+    }
+    .nav-progress {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 500; color: var(--text-muted);
+    }
+    .nav-progress strong { color: var(--sage); font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+    .progress-ring { width: 28px; height: 28px; transform: rotate(-90deg); }
+    .progress-ring-bg { stroke: var(--border); fill: none; stroke-width: 3; }
+    .progress-ring-fill { stroke: var(--sage); fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 600ms ease; }
+
+    /* === MAIN === */
+    main { max-width: 960px; margin: 0 auto; padding: 32px 28px 80px; }
+    .page { display: none; }
+    .page.active { display: block; animation: fadeIn 300ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* === SECTION HEADER === */
+    .section-header { margin-bottom: 28px; }
+    .section-header-row { display: flex; justify-content: space-between; align-items: flex-end; }
+    .section-title { font-size: 28px; letter-spacing: -0.5px; }
+    .section-subtitle { font-size: 14px; color: var(--text-muted); margin-top: 6px; font-weight: 400; }
+    .section-rule { height: 1px; background: var(--border); margin-top: 16px; }
+
+    /* === CARDS === */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+      transition: box-shadow 200ms ease, border-color 200ms ease;
+      position: relative;
+    }
+    .card:hover { box-shadow: var(--shadow); border-color: #DDD6C8; }
+    .card-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .card-icon {
+      width: 38px; height: 38px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .card-title { font-size: 17px; letter-spacing: -0.2px; }
+    .card-subtitle { font-size: 12px; color: var(--text-muted); font-family: 'Outfit', sans-serif; margin-top: 2px; }
+
+    /* block accent stripe */
+    .card-accent { position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; border-radius: 0 2px 2px 0; }
+
+    /* === BLOCK COLORS === */
+    .block-context .card-icon { background: var(--indigo-bg); color: var(--indigo); }
+    .block-context .card-accent { background: var(--indigo); }
+    .block-behavior .card-icon { background: var(--sage-bg); color: var(--sage); }
+    .block-behavior .card-accent { background: var(--sage); }
+    .block-alternatives .card-icon { background: var(--amber-bg); color: var(--amber); }
+    .block-alternatives .card-accent { background: var(--amber); }
+    .block-impact .card-icon { background: var(--coral-bg); color: var(--coral); }
+    .block-impact .card-accent { background: var(--coral); }
+    .block-commitment .card-icon { background: var(--plum-bg); color: var(--plum); }
+    .block-commitment .card-accent { background: var(--plum); }
+
+    /* === QUESTIONS === */
+    .question-item {
+      padding: 14px 18px; margin-bottom: 8px;
+      border-radius: var(--radius);
+      background: var(--bg-warm);
+      border: 1px solid transparent;
+      transition: all 200ms ease;
+      position: relative;
+    }
+    .question-item:hover { background: var(--bg-inset); border-color: var(--border); }
+    .question-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 500; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px;
+    }
+    .question-text { font-size: 14.5px; font-weight: 500; color: var(--ink); line-height: 1.55; }
+    .question-goal {
+      font-size: 12px; color: var(--text-muted); margin-top: 6px;
+      padding-left: 12px; border-left: 2px solid var(--border);
+    }
+    .question-v2 { border-left: 3px solid var(--sage); }
+    .question-v2 .question-num { color: var(--sage); }
+
+    /* === SCRIPT BOX === */
+    .script-box {
+      background: var(--bg-code); color: #D4CFC5;
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      font-size: 14px; line-height: 1.85;
+      font-family: 'Outfit', sans-serif;
+      position: relative;
+    }
+    .script-box::before {
+      content: '"'; font-family: 'DM Serif Display', serif;
+      font-size: 48px; color: rgba(255,255,255,0.08);
+      position: absolute; top: 8px; left: 16px; line-height: 1;
+    }
+    .script-box strong { color: var(--amber-light); }
+    .script-hint { font-size: 12px; color: #8A8279; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); }
+
+    /* === RED FLAGS === */
+    .red-flag-card { border-color: var(--coral-light); }
+    .red-flag-card:hover { border-color: var(--coral); }
+    .red-flag-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px; margin-bottom: 6px;
+      background: var(--coral-bg); border-radius: var(--radius);
+      font-size: 13px; color: var(--coral); font-weight: 500;
+    }
+    .red-flag-item svg { flex-shrink: 0; margin-top: 1px; }
+
+    /* === FORM === */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .form-full { grid-column: 1 / -1; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label {
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+    }
+    .form-input, .form-select, .form-textarea {
+      background: var(--bg-warm); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 11px 14px;
+      color: var(--ink); font-size: 14px; font-family: inherit;
+      transition: all 200ms ease; outline: none; width: 100%;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: var(--amber); background: var(--bg-card);
+      box-shadow: 0 0 0 3px var(--amber-bg);
+    }
+    .form-input::placeholder, .form-textarea::placeholder { color: var(--text-dim); }
+    .form-textarea { min-height: 80px; resize: vertical; }
+    .form-select { cursor: pointer; }
+
+    /* === PILLS === */
+    .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+    .checkbox-pill {
+      display: flex; align-items: center;
+      padding: 7px 16px; background: var(--bg-warm);
+      border: 1px solid var(--border); border-radius: 50px;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      color: var(--text-muted); transition: all 200ms ease; user-select: none;
+    }
+    .checkbox-pill:hover { border-color: var(--amber); color: var(--text-body); }
+    .checkbox-pill input { display: none; }
+    .checkbox-pill.checked {
+      background: var(--amber-bg); border-color: var(--amber);
+      color: var(--amber); font-weight: 600;
+    }
+
+    /* === RANGE === */
+    .range-group { display: flex; align-items: center; gap: 12px; }
+    .range-group input[type="range"] {
+      flex: 1; -webkit-appearance: none; height: 4px;
+      background: var(--border); border-radius: 2px; outline: none;
+    }
+    .range-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: var(--amber);
+      border: 3px solid var(--bg-card);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: pointer;
+    }
+    .range-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px; font-weight: 500; width: 32px; text-align: center; color: var(--amber);
+    }
+
+    /* === BUTTONS === */
+    .btn {
+      padding: 10px 22px; border-radius: var(--radius);
+      font-size: 13px; font-weight: 600; font-family: inherit;
+      cursor: pointer; border: 1px solid transparent;
+      transition: all 200ms ease;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn-primary:hover { background: #2D2A24; }
+    .btn-success { background: var(--sage); color: white; border-color: var(--sage); }
+    .btn-success:hover { background: #4E7A60; }
+    .btn-outline { background: var(--bg-card); color: var(--text-muted); border-color: var(--border); }
+    .btn-outline:hover { border-color: var(--text-dim); color: var(--text-body); }
+    .btn-danger { background: var(--coral-bg); color: var(--coral); border-color: var(--coral-light); }
+    .btn-danger:hover { background: #FBEAE5; }
+    .btn-group { display: flex; gap: 10px; margin-top: 24px; }
+
+    /* === TABLE === */
+    .interview-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 100px 80px 90px 60px;
+      align-items: center; padding: 14px 20px;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 13px; transition: background 150ms ease;
+    }
+    .interview-row:hover { background: var(--bg-warm); }
+    .interview-row:last-child { border-bottom: none; }
+    .interview-row-header {
+      color: var(--text-dim); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.8px; font-size: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .interview-row-header:hover { background: transparent; }
+    .interview-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--text-dim); font-weight: 500;
+    }
+
+    .badge { padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: var(--sage-bg); color: var(--sage); }
+    .badge-yellow { background: var(--amber-bg); color: var(--amber); }
+    .badge-red { background: var(--coral-bg); color: var(--coral); }
+
+    /* === DASHBOARD === */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 22px 20px;
+      box-shadow: var(--shadow-sm); text-align: center;
+    }
+    .stat-value { font-size: 38px; letter-spacing: -1px; line-height: 1; }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
+    .stat-bar {
+      height: 3px; background: var(--bg-inset);
+      border-radius: 2px; margin-top: 14px; overflow: hidden;
+    }
+    .stat-bar-fill { height: 100%; border-radius: 2px; transition: width 700ms cubic-bezier(0.4, 0, 0.2, 1); }
+
+    .stat-color-accent .stat-value { color: var(--indigo); }
+    .stat-color-accent .stat-bar-fill { background: var(--indigo); }
+    .stat-color-green .stat-value { color: var(--sage); }
+    .stat-color-green .stat-bar-fill { background: var(--sage); }
+    .stat-color-amber .stat-value { color: var(--amber); }
+    .stat-color-amber .stat-bar-fill { background: var(--amber); }
+    .stat-color-plum .stat-value { color: var(--plum); }
+    .stat-color-plum .stat-bar-fill { background: var(--plum); }
+
+    /* === GATE === */
+    .gate-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 28px;
+      box-shadow: var(--shadow-sm); margin-top: 24px;
+    }
+    .gate-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 11px 0; border-bottom: 1px solid var(--border-light);
+      font-size: 14px; font-weight: 450;
+    }
+    .gate-row:last-child { border-bottom: none; }
+    .gate-verdict {
+      margin-top: 20px; padding-top: 18px;
+      border-top: 2px solid var(--border); text-align: center;
+    }
+    .gate-verdict-text { font-size: 20px; letter-spacing: -0.3px; }
+
+    /* === TOAST === */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      padding: 14px 24px; background: var(--sage); color: white;
+      border-radius: var(--radius); font-size: 14px; font-weight: 600;
+      box-shadow: var(--shadow-lg);
+      transform: translateY(80px); opacity: 0;
+      transition: all 350ms cubic-bezier(0.4, 0, 0.2, 1); z-index: 200;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    /* === EMPTY === */
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state svg { width: 40px; height: 40px; margin-bottom: 14px; color: var(--text-dim); opacity: 0.5; }
+    .empty-state h3 { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+    .empty-state p { font-size: 13px; color: var(--text-muted); max-width: 280px; margin: 0 auto; }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .interview-row { grid-template-columns: 32px 1fr 80px; }
+      .interview-row > :nth-child(n+4) { display: none; }
+      .nav-progress { display: none; }
+      .nav-tabs { gap: 0; }
+      .nav-tab { padding: 6px 10px; font-size: 12px; }
+      .section-title { font-size: 22px; }
+      main { padding: 20px 16px 60px; }
+      .card { padding: 20px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="nav-brand">
+      <div class="nav-brand-dot"></div>
+      Interview Tracker
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('roteiro',this)">Roteiro</button>
+      <button class="nav-tab" onclick="showPage('registrar',this)">Registrar</button>
+      <button class="nav-tab" onclick="showPage('entrevistas',this)">Entrevistas</button>
+      <button class="nav-tab" onclick="showPage('dashboard',this)">Dashboard</button>
+    </div>
+    <div class="nav-progress">
+      <svg class="progress-ring" viewBox="0 0 32 32">
+        <circle class="progress-ring-bg" cx="16" cy="16" r="13"/>
+        <circle class="progress-ring-fill" id="progress-circle" cx="16" cy="16" r="13" stroke-dasharray="81.68" stroke-dashoffset="81.68"/>
+      </svg>
+      <span><strong id="nav-count">0</strong>/10</span>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ===== ROTEIRO ===== -->
+  <div id="page-roteiro" class="page active">
+    <div class="section-header">
+      <div class="section-header-row">
+        <div>
+          <div class="section-title">Roteiro de Entrevista</div>
+          <div class="section-subtitle">Mom Test v2 — 17 perguntas, 5 blocos. 15-20 min por entrevista.</div>
+        </div>
+      </div>
+      <div class="section-rule"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:var(--bg-inset);color:var(--text-muted)">AB</div>
+        <div><div class="card-title">Abertura</div><div class="card-subtitle">2 minutos — Estabelecer contexto</div></div>
+      </div>
+      <div class="script-box">Opa, tudo bem? Estou estudando como as pessoas usam <strong>sistemas de gestão</strong> no dia a dia — tipo ERP, WMS, sistemas de supply chain. Quero entender como é a rotina real. <strong>Não tenho nada pra vender</strong>, só quero ouvir sua experiência. Pode ser bem honesto, até as reclamações são úteis.<div class="script-hint">Posiciona como pesquisa. Pede honestidade. Nenhuma menção à solução.</div></div>
+    </div>
+
+    <div class="card block-context">
+      <div class="card-accent"></div>
+      <div class="card-header">
+        <div class="card-icon">B1</div>
+        <div><div class="card-title">Bloco 1 — Contexto</div><div class="card-subtitle">3 minutos</div></div>
+      </div>
+      <div class="question-item"><div class="question-num">Pergunta 01</div><div class="question-text">Que sistema você usa no dia a dia no trabalho?</div><div class="question-goal">Identificar o sistema específico</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 02</div><div class="question-text">Há quanto tempo você usa?</div><div class="question-goal">Contexto de experiência</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 03</div><div class="question-text">Como foi quando você começou a usar? Alguém te ensinou?</div><div class="question-goal">Como aprendeu — valida ou invalida a dor</div></div>
+    </div>
+
+    <div class="card block-behavior">
+      <div class="card-accent"></div>
+      <div class="card-header">
+        <div class="card-icon">B2</div>
+        <div><div class="card-title">Bloco 2 — Comportamento Passado</div><div class="card-subtitle">5 minutos — O mais importante</div></div>
+      </div>
+      <div class="question-item"><div class="question-num">Pergunta 04</div><div class="question-text">Me conta da última vez que você ficou travado sem saber o que fazer no sistema.</div><div class="question-goal">Dor real, situação específica</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 05</div><div class="question-text">O que você fez pra resolver? Perguntou pra alguém? Quem?</div><div class="question-goal">Comportamento atual — como resolve hoje</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 06</div><div class="question-text">Quanto tempo levou até conseguir resolver?</div><div class="question-goal">Custo real em tempo</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 07</div><div class="question-text">Isso acontece com que frequência? Tipo, uma vez por semana, por dia?</div><div class="question-goal">Frequência — quanto mais alta, mais dor</div></div>
+      <div class="question-item question-v2"><div class="question-num">Pergunta 08 — v2 corrigida</div><div class="question-text">Tem alguma situação no sistema que você sabe QUE tem que fazer, mas não sabe exatamente ONDE clicar ou POR QUÊ aquele campo é importante?</div><div class="question-goal">Valida necessidade de orientação (não automação)</div></div>
+    </div>
+
+    <div class="card block-alternatives">
+      <div class="card-accent"></div>
+      <div class="card-header">
+        <div class="card-icon">B3</div>
+        <div><div class="card-title">Bloco 3 — Alternativas e Tentativas</div><div class="card-subtitle">3 minutos</div></div>
+      </div>
+      <div class="question-item"><div class="question-num">Pergunta 09</div><div class="question-text">A empresa já deu algum treinamento sobre o sistema? Como foi?</div><div class="question-goal">Qualidade do treinamento atual</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 10</div><div class="question-text">Tem alguém na equipe que é o "guru" do sistema — aquele que todo mundo pergunta?</div><div class="question-goal">Valida dependência de colega expert</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 11</div><div class="question-text">Se esse "guru" sai de férias ou pede demissão, o que acontece?</div><div class="question-goal">Risco real para a operação</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 12</div><div class="question-text">Você já usou algum suporte do próprio sistema? Chat, bot, documentação?</div><div class="question-goal">Alternativas existentes e satisfação</div></div>
+    </div>
+
+    <div class="card block-impact">
+      <div class="card-accent"></div>
+      <div class="card-header">
+        <div class="card-icon">B4</div>
+        <div><div class="card-title">Bloco 4 — Impacto e Consequências</div><div class="card-subtitle">3 minutos</div></div>
+      </div>
+      <div class="question-item"><div class="question-num">Pergunta 13</div><div class="question-text">Já aconteceu algum erro no sistema que gerou problema sério? Tipo estoque errado, pedido duplicado?</div><div class="question-goal">Consequências reais de não saber usar</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 14</div><div class="question-text">Quando entra alguém novo na equipe, quanto tempo leva até a pessoa conseguir trabalhar sozinha no sistema?</div><div class="question-goal">Curva de aprendizado real</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 15</div><div class="question-text">O que é mais frustrante no seu dia a dia com o sistema?</div><div class="question-goal">Pergunta aberta — pode revelar dor inesperada</div></div>
+    </div>
+
+    <div class="card block-commitment">
+      <div class="card-accent"></div>
+      <div class="card-header">
+        <div class="card-icon">B5</div>
+        <div><div class="card-title">Bloco 5 — Compromisso</div><div class="card-subtitle">2 minutos</div></div>
+      </div>
+      <div class="question-item"><div class="question-num">Pergunta 16</div><div class="question-text">Se existisse uma forma de reduzir pela metade o tempo que você leva pra aprender algo novo no sistema, quanto isso valeria pra você?</div><div class="question-goal">Disposição para pagar (sem revelar solução)</div></div>
+      <div class="question-item"><div class="question-num">Pergunta 17</div><div class="question-text">Conhece mais 2-3 colegas que usam sistemas parecidos e teriam 15 min pra conversar comigo?</div><div class="question-goal">Referências = sinal forte</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:var(--bg-inset);color:var(--text-muted)">FE</div>
+        <div><div class="card-title">Fechamento</div><div class="card-subtitle">Encerrar e garantir follow-up</div></div>
+      </div>
+      <div class="script-box">Muito obrigado, isso me ajuda demais. <strong>Posso te procurar de novo</strong> se eu tiver mais perguntas?<div class="script-hint">Se disser sim = compromisso. Se inventar desculpa = problema não é grande o suficiente.</div></div>
+    </div>
+
+    <div class="card red-flag-card">
+      <div class="card-header">
+        <div class="card-icon" style="background:var(--coral-bg);color:var(--coral)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        </div>
+        <div><div class="card-title" style="color:var(--coral)">Red Flags</div><div class="card-subtitle">Erros que invalidam a entrevista</div></div>
+      </div>
+      <div class="red-flag-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg><span>"Estou criando um assistente com IA que..." — Revelou a solução</span></div>
+      <div class="red-flag-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg><span>"Não seria legal se o sistema te dissesse o que fazer?" — Pergunta indutiva</span></div>
+      <div class="red-flag-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg><span>Entrevistar só colegas da mesma empresa — Viés de cultura</span></div>
+      <div class="red-flag-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg><span>Aceitar "sim, eu compraria" como validação — Busque comportamento passado</span></div>
+    </div>
+  </div>
+
+  <!-- ===== REGISTRAR ===== -->
+  <div id="page-registrar" class="page">
+    <div class="section-header">
+      <div class="section-header-row">
+        <div><div class="section-title">Registrar Entrevista</div><div class="section-subtitle">Preencha logo após a conversa enquanto a memória está fresca.</div></div>
+        <button class="btn btn-outline" onclick="clearForm()">Limpar</button>
+      </div>
+      <div class="section-rule"></div>
+    </div>
+    <form id="interview-form" onsubmit="saveInterview(event)">
+      <div class="card">
+        <div class="card-header"><div class="card-icon" style="background:var(--indigo-bg);color:var(--indigo)">ID</div><div class="card-title">Identificação</div></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Nome</label><input type="text" class="form-input" id="f-nome" required placeholder="Nome do entrevistado"></div>
+          <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-input" id="f-data" required></div>
+          <div class="form-group"><label class="form-label">Cargo</label><input type="text" class="form-input" id="f-cargo" placeholder="Ex: Analista de Supply Chain"></div>
+          <div class="form-group"><label class="form-label">Sistema</label><input type="text" class="form-input" id="f-sistema" placeholder="Ex: Relex, SAP, NeoGrid"></div>
+          <div class="form-group"><label class="form-label">Tempo de uso</label><input type="text" class="form-input" id="f-tempo-uso" placeholder="Ex: 2 anos"></div>
+          <div class="form-group"><label class="form-label">Relação</label><select class="form-select" id="f-relacao"><option value="desconhecido">Desconhecido</option><option value="indicacao">Indicação</option><option value="colega-outra">Colega outra empresa</option><option value="colega-mesma">Colega mesma empresa</option><option value="amigo">Amigo/Família</option></select></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon" style="background:var(--sage-bg);color:var(--sage)">AP</div><div class="card-title">Aprendizado & Frequência</div></div>
+        <div class="form-grid">
+          <div class="form-group form-full"><label class="form-label">Como aprendeu?</label><div class="checkbox-group" id="f-como-aprendeu"><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="colega">Colega</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="treinamento">Treinamento</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="sozinho">Sozinho</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="consultoria">Consultoria</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="outro">Outro</label></div></div>
+          <div class="form-group"><label class="form-label">Frequência da dor</label><select class="form-select" id="f-frequencia"><option value="">Selecione</option><option value="diaria">Diária</option><option value="semanal">Semanal</option><option value="mensal">Mensal</option><option value="raro">Raro</option></select></div>
+          <div class="form-group"><label class="form-label">Tempo perdido por vez</label><input type="text" class="form-input" id="f-tempo-perdido" placeholder="Ex: 30 min"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon" style="background:var(--amber-bg);color:var(--amber)">OR</div><div class="card-title">Orientação & Dependência</div></div>
+        <div class="form-grid">
+          <div class="form-group form-full"><label class="form-label">Sabe O QUE mas não sabe ONDE/COMO?</label><div class="checkbox-group" id="f-sabe-que-nao-onde"><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="sim">Sim</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="nao">Não</label></div></div>
+          <div class="form-group form-full"><label class="form-label">Exemplo</label><textarea class="form-textarea" id="f-exemplo-orientacao" placeholder="Situação relatada"></textarea></div>
+          <div class="form-group"><label class="form-label">Tem guru?</label><select class="form-select" id="f-guru"><option value="">Selecione</option><option value="sim">Sim</option><option value="nao">Não</option></select></div>
+          <div class="form-group"><label class="form-label">Se guru sair</label><input type="text" class="form-input" id="f-guru-impacto" placeholder="Impacto na operação"></div>
+          <div class="form-group"><label class="form-label">Suporte do sistema</label><select class="form-select" id="f-suporte"><option value="">Selecione</option><option value="sim-bom">Sim, resolveu</option><option value="sim-ruim">Sim, não resolveu</option><option value="nao">Não usou</option></select></div>
+          <div class="form-group"><label class="form-label">Nota suporte (0-10)</label><div class="range-group"><input type="range" min="0" max="10" value="5" id="f-nota-suporte" oninput="document.getElementById('nota-val').textContent=this.value"><span class="range-value" id="nota-val">5</span></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon" style="background:var(--coral-bg);color:var(--coral)">IM</div><div class="card-title">Impacto & Onboarding</div></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Onboarding</label><input type="text" class="form-input" id="f-onboarding" placeholder="Ex: 3 meses"></div>
+          <div class="form-group"><label class="form-label">Erros graves?</label><select class="form-select" id="f-erros"><option value="">Selecione</option><option value="sim">Sim</option><option value="nao">Não</option></select></div>
+          <div class="form-group form-full"><label class="form-label">Descrição do erro</label><textarea class="form-textarea" id="f-erro-descricao" placeholder="Qual erro? Consequência?"></textarea></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon" style="background:var(--plum-bg);color:var(--plum)">CO</div><div class="card-title">Compromissos & Insights</div></div>
+        <div class="form-grid">
+          <div class="form-group form-full"><label class="form-label">Compromissos</label><div class="checkbox-group" id="f-compromissos"><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="referenciou">Referenciou colegas</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="segundo-contato">Segundo contato</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="tempo-recurso">Ofereceu tempo</label><label class="checkbox-pill" onclick="togglePill(this)"><input type="checkbox" value="nenhum">Nenhum</label></div></div>
+          <div class="form-group form-full"><label class="form-label">Nomes referenciados</label><input type="text" class="form-input" id="f-referencias" placeholder="Separados por vírgula"></div>
+          <div class="form-group form-full"><label class="form-label">Frase mais importante</label><textarea class="form-textarea" id="f-frase" placeholder="A frase exata que mais chamou atenção"></textarea></div>
+          <div class="form-group form-full"><label class="form-label">Surpresa</label><textarea class="form-textarea" id="f-surpresa" placeholder="Algo inesperado"></textarea></div>
+          <div class="form-group form-full"><label class="form-label">Hipótese invalidada</label><textarea class="form-textarea" id="f-hipotese" placeholder="Algo que achava verdade mas não é"></textarea></div>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button type="submit" class="btn btn-success"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>Salvar Entrevista</button>
+        <button type="button" class="btn btn-outline" onclick="clearForm()">Limpar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===== ENTREVISTAS ===== -->
+  <div id="page-entrevistas" class="page">
+    <div class="section-header">
+      <div class="section-header-row">
+        <div><div class="section-title">Entrevistas Realizadas</div></div>
+        <button class="btn btn-outline" onclick="exportData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Exportar JSON</button>
+      </div>
+      <div class="section-rule"></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="interview-row interview-row-header"><span>#</span><span>Nome / Sistema</span><span>Frequência</span><span>Guru?</span><span>Compromisso</span><span></span></div>
+      <div id="interviews-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div id="page-dashboard" class="page">
+    <div class="section-header">
+      <div class="section-header-row"><div><div class="section-title">Dashboard — Gate Fase 1</div><div class="section-subtitle">Critérios para avançar da validação de problema para o Lean Canvas.</div></div></div>
+      <div class="section-rule"></div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card stat-color-accent"><div class="stat-value" id="d-total">0</div><div class="stat-label">Entrevistas</div><div class="stat-bar"><div class="stat-bar-fill" id="bar-total" style="width:0%"></div></div></div>
+      <div class="stat-card stat-color-green"><div class="stat-value" id="d-desconhecidos">0</div><div class="stat-label">Desconhecidos</div><div class="stat-bar"><div class="stat-bar-fill" id="bar-desc" style="width:0%"></div></div></div>
+      <div class="stat-card stat-color-amber"><div class="stat-value" id="d-dor">0%</div><div class="stat-label">Confirmam dor</div><div class="stat-bar"><div class="stat-bar-fill" id="bar-dor" style="width:0%"></div></div></div>
+      <div class="stat-card stat-color-plum"><div class="stat-value" id="d-compromissos">0</div><div class="stat-label">Compromissos</div><div class="stat-bar"><div class="stat-bar-fill" id="bar-comp" style="width:0%"></div></div></div>
+    </div>
+    <div class="gate-box">
+      <div class="card-header">
+        <div class="card-icon" style="background:var(--sage-bg);color:var(--sage)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></div>
+        <div><div class="card-title">Critérios do Gate</div><div class="card-subtitle">Todos devem ser atingidos para avançar</div></div>
+      </div>
+      <div class="gate-row"><span>Entrevistas realizadas ≥ 10</span><span id="g-total" class="badge badge-red">0/10</span></div>
+      <div class="gate-row"><span>Com desconhecidos ≥ 7</span><span id="g-desc" class="badge badge-red">0/7</span></div>
+      <div class="gate-row"><span>Padrão de dor confirmado ≥ 70%</span><span id="g-dor" class="badge badge-red">0%</span></div>
+      <div class="gate-row"><span>Compromissos obtidos ≥ 3</span><span id="g-comp" class="badge badge-red">0/3</span></div>
+      <div class="gate-row"><span>Pelo menos 1 hipótese invalidada</span><span id="g-hip" class="badge badge-red">Não</span></div>
+      <div class="gate-verdict"><div class="gate-verdict-text" id="gate-verdict" style="color:var(--coral)">Gate: Nenhuma entrevista realizada</div></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>Entrevista salva</div>
+
+<script>
+let interviews = JSON.parse(localStorage.getItem('startup-interviews') || '[]');
+
+function showPage(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (page === 'entrevistas') renderInterviews();
+  if (page === 'dashboard') renderDashboard();
+}
+
+function togglePill(el) {
+  const cb = el.querySelector('input');
+  cb.checked = !cb.checked;
+  el.classList.toggle('checked', cb.checked);
+}
+
+function getChecked(id) {
+  return [...document.querySelectorAll('#' + id + ' input:checked')].map(c => c.value);
+}
+
+function saveInterview(e) {
+  e.preventDefault();
+  interviews.push({
+    id: Date.now(),
+    nome: document.getElementById('f-nome').value,
+    data: document.getElementById('f-data').value,
+    cargo: document.getElementById('f-cargo').value,
+    sistema: document.getElementById('f-sistema').value,
+    tempoUso: document.getElementById('f-tempo-uso').value,
+    relacao: document.getElementById('f-relacao').value,
+    comoAprendeu: getChecked('f-como-aprendeu'),
+    frequencia: document.getElementById('f-frequencia').value,
+    tempoPerdido: document.getElementById('f-tempo-perdido').value,
+    sabeQueNaoOnde: getChecked('f-sabe-que-nao-onde'),
+    exemploOrientacao: document.getElementById('f-exemplo-orientacao').value,
+    guru: document.getElementById('f-guru').value,
+    guruImpacto: document.getElementById('f-guru-impacto').value,
+    suporte: document.getElementById('f-suporte').value,
+    notaSuporte: document.getElementById('f-nota-suporte').value,
+    onboarding: document.getElementById('f-onboarding').value,
+    erros: document.getElementById('f-erros').value,
+    erroDescricao: document.getElementById('f-erro-descricao').value,
+    compromissos: getChecked('f-compromissos'),
+    referencias: document.getElementById('f-referencias').value,
+    frase: document.getElementById('f-frase').value,
+    surpresa: document.getElementById('f-surpresa').value,
+    hipotese: document.getElementById('f-hipotese').value,
+  });
+  localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+  updateNavCount(); showToast(); clearForm();
+}
+
+function clearForm() {
+  document.getElementById('interview-form').reset();
+  document.querySelectorAll('.checkbox-pill').forEach(p => { p.classList.remove('checked'); p.querySelector('input').checked = false; });
+  document.getElementById('nota-val').textContent = '5';
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+}
+
+function showToast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function renderInterviews() {
+  const list = document.getElementById('interviews-list');
+  if (!interviews.length) {
+    list.innerHTML = '<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10"/></svg><h3>Nenhuma entrevista ainda</h3><p>Vá em Registrar para adicionar a primeira.</p></div>';
+    return;
+  }
+  list.innerHTML = interviews.map((iv, i) => {
+    const freq = iv.frequencia || '—';
+    const guru = iv.guru === 'sim' ? 'Sim' : iv.guru === 'nao' ? 'Não' : '—';
+    const hasComp = iv.compromissos && iv.compromissos.length > 0 && !iv.compromissos.includes('nenhum');
+    return `<div class="interview-row">
+      <span class="interview-num">${String(i+1).padStart(2,'0')}</span>
+      <span><strong style="color:var(--ink)">${iv.nome}</strong><br><span style="color:var(--text-muted);font-size:12px">${iv.sistema||'—'} · ${iv.cargo||'—'}</span></span>
+      <span class="badge ${freq==='diaria'?'badge-green':freq==='semanal'?'badge-yellow':'badge-red'}">${freq}</span>
+      <span style="font-weight:500">${guru}</span>
+      <span>${hasComp?'<span class="badge badge-green">Sim</span>':'<span class="badge badge-red">Não</span>'}</span>
+      <span><button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="deleteInterview(${iv.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>
+    </div>`;
+  }).join('');
+}
+
+function deleteInterview(id) {
+  if (!confirm('Deletar esta entrevista?')) return;
+  interviews = interviews.filter(iv => iv.id !== id);
+  localStorage.setItem('startup-interviews', JSON.stringify(interviews));
+  updateNavCount(); renderInterviews();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(interviews, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'entrevistas-mom-test-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+}
+
+function renderDashboard() {
+  const t = interviews.length;
+  const desc = interviews.filter(iv => iv.relacao === 'desconhecido' || iv.relacao === 'indicacao').length;
+  const dor = interviews.filter(iv => iv.frequencia === 'diaria' || iv.frequencia === 'semanal').length;
+  const dorP = t > 0 ? Math.round((dor/t)*100) : 0;
+  const comp = interviews.filter(iv => iv.compromissos && iv.compromissos.length > 0 && !iv.compromissos.includes('nenhum')).length;
+  const hip = interviews.filter(iv => iv.hipotese && iv.hipotese.trim().length > 0).length;
+
+  document.getElementById('d-total').textContent = t;
+  document.getElementById('d-desconhecidos').textContent = desc;
+  document.getElementById('d-dor').textContent = dorP + '%';
+  document.getElementById('d-compromissos').textContent = comp;
+  document.getElementById('bar-total').style.width = Math.min(t/10*100,100)+'%';
+  document.getElementById('bar-desc').style.width = Math.min(desc/7*100,100)+'%';
+  document.getElementById('bar-dor').style.width = dorP+'%';
+  document.getElementById('bar-comp').style.width = Math.min(comp/3*100,100)+'%';
+
+  setGate('g-total',t,10,t+'/10'); setGate('g-desc',desc,7,desc+'/7');
+  setGate('g-dor',dorP,70,dorP+'%'); setGate('g-comp',comp,3,comp+'/3');
+  const gH = document.getElementById('g-hip');
+  gH.textContent = hip > 0 ? 'Sim ('+hip+')' : 'Não';
+  gH.className = 'badge ' + (hip > 0 ? 'badge-green' : 'badge-red');
+
+  const allPass = t >= 10 && desc >= 7 && dorP >= 70 && comp >= 3 && hip > 0;
+  const v = document.getElementById('gate-verdict');
+  if (allPass) { v.textContent = 'Gate aprovado — pronto para Fase 2'; v.style.color = 'var(--sage)'; }
+  else if (t === 0) { v.textContent = 'Gate: Nenhuma entrevista realizada'; v.style.color = 'var(--coral)'; }
+  else { v.textContent = 'Gate: Critérios pendentes'; v.style.color = 'var(--amber)'; }
+}
+
+function setGate(id, val, target, label) {
+  const el = document.getElementById(id);
+  el.textContent = label;
+  el.className = 'badge ' + (val >= target ? 'badge-green' : 'badge-red');
+}
+
+function updateNavCount() {
+  const c = interviews.length;
+  document.getElementById('nav-count').textContent = c;
+  const pct = Math.min(c / 10, 1);
+  const circ = document.getElementById('progress-circle');
+  if (circ) circ.style.strokeDashoffset = 81.68 * (1 - pct);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  updateNavCount();
+});
+</script>
+</body>
+</html>
